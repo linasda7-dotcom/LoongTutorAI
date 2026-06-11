@@ -1,0 +1,6 @@
+siliconflow:
+  base-url: https://api.siliconflow.cn/v1
+  api-key: sk-ixqkskewsxpgztvirbkrkuwaemcnnidlficxiyfqtxfnhhek
+  timeout: 3000
+server:
+  port: 8080

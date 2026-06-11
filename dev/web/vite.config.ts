@@ -5,11 +5,18 @@ import path from 'path'
 export default defineConfig({
   plugins: [vue()],
   server: {
-    host: "0.0.0.0"
+    host: "0.0.0.0",
+    port: 5173,
+    allowedHosts: [
+      "deepdistillation.xyz"
+    ]
   },
-  resolve:{
-    alias:{
-      '@':path.resolve(__dirname,'./src')
+  build: {
+    outDir: "../../nginx-1.31.1/html"
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
     }
   }
 })
