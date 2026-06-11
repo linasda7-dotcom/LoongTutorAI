@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.example.agent.core.memory.ChatMemory;
 import com.example.agent.core.message.AiMessage;
+import com.example.agent.core.message.ToolMessage;
 import com.example.agent.core.message.UserMessage;
 import com.example.agent.core.model.ChatModel;
 import com.example.agent.core.tool.ToolCall;
@@ -23,6 +24,7 @@ public class AiServiceInvocationHandler implements InvocationHandler {
 
     public AiServiceInvocationHandler(ChatModel chatModel, ChatMemory chatMemory, String systemMessage,
             Object[] tools) {
+
         this.chatModel = chatModel;
         this.chatMemory = chatMemory;
         this.systemMessage = systemMessage;
@@ -38,28 +40,41 @@ public class AiServiceInvocationHandler implements InvocationHandler {
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         // 对象数组下标的第一条消息即用户输入的消息
         String message = (String) args[0];
+
         if (chatMemory != null) {
             // 如果消息里不是空就添加
             chatMemory.add(new UserMessage(message));
         }
-        String prompt;
-        if (chatMemory != null) {
-            // 把历史消息组成prompt
-            prompt = buildPrompt();
-        } else {
-            prompt = buildPromptWithoutMemory(message);
-        }
+
+        String prompt = chatMemory != null ? buildPrompt() : buildPromptWithoutMemory(message);
 
         String chat = chatModel.chat(prompt);
+
         if (ToolCallParser.isToolCall(chat)) {
-            ToolCall toolCall = ToolCallParser.pares(chat);
+            // 拿到工具名称和参数
+            ToolCall toolCall = ToolCallParser.parse(chat);
+            // 从列表找到工具
             ToolMetadata tool = findTool(toolCall.name());
-            Object execute = ToolExecutor.execute(tool, toolCall.argument());
-            chat = String.valueOf(execute);
+            // 执行工具
+            Object toolResult = ToolExecutor.execute(
+                    tool,
+                    toolCall.argument());
+
+            if (chatMemory != null) {
+                chatMemory.add(new ToolMessage(String.valueOf(toolResult)));
+            }
+
+            String finalPrompt = chatMemory != null
+                    ? buildPrompt()
+                    : prompt + "tool:" + toolResult + "\n";
+
+            chat = chatModel.chat(finalPrompt);
         }
+
         if (chatMemory != null) {
             chatMemory.add(new AiMessage(chat));
         }
+
         return chat;
     }
 
@@ -93,7 +108,7 @@ public class AiServiceInvocationHandler implements InvocationHandler {
         appendSystemMessage(promptBuilder);
         appendTools(promptBuilder);
         promptBuilder
-                .append("user")
+                .append("user:")
                 .append(message)
                 .append("\n");
         return promptBuilder.toString();
@@ -106,7 +121,7 @@ public class AiServiceInvocationHandler implements InvocationHandler {
      */
     private void appendSystemMessage(StringBuilder promptBuilder) {
 
-        if (promptBuilder != null && !systemMessage.isBlank()) {
+        if (systemMessage != null && !systemMessage.isBlank()) {
             promptBuilder
                     .append("system:")
                     .append(systemMessage)

@@ -20,9 +20,7 @@ public class AiServiceTest {
                 .build();
 
         assistant.chat("你好!今天广州天气怎么样");
-        assistant.chat("我叫林");
-        assistant.chat("我叫什么");
-        assistant.chat("Builder的设计模式是什么？");
-        System.out.println("memory = " + memory.messages().size());
+        System.out.println("memorySize = " + memory.messages().size());
+
     }
 }
