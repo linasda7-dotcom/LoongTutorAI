@@ -2,10 +2,10 @@ package com.example.agent.core.service;
 
 import org.junit.jupiter.api.Test;
 
-import com.example.agent.core.agent.Assistant;
 import com.example.agent.core.memory.ChatMemory;
 import com.example.agent.core.memory.MessageWindowChatMemory;
-import com.example.agent.core.tool.WeatherTool;
+import com.example.agent.demo.Assistant;
+import com.example.agent.demo.WeatherTool;
 import com.example.agent.provider.openai.OpenAiChatModel;
 
 public class AiServiceTest {
@@ -15,7 +15,7 @@ public class AiServiceTest {
         Assistant assistant = AiService.builder(Assistant.class)
                 .chatMemory(memory)
                 .systemMessage("你是一个Java架构设计专家")
-                .chatModel(new OpenAiChatModel())
+                .chatModel(new OpenAiChatModel("OpenAi"))
                 .tools(new WeatherTool())
                 .build();
 

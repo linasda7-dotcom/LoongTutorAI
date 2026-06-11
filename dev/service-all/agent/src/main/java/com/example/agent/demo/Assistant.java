@@ -1,4 +1,4 @@
-package com.example.agent.core.agent;
+package com.example.agent.demo;
 
 public interface Assistant {
     String chat(String message);

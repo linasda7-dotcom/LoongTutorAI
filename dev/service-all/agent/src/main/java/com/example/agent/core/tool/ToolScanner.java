@@ -4,6 +4,8 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.example.agent.core.annotation.Tool;
+
 public class ToolScanner {
     public static List<ToolMetadata> scan(Object toolObject) {
         List<ToolMetadata> tools = new ArrayList<>();

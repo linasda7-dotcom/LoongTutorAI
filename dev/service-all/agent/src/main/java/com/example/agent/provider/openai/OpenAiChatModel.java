@@ -1,45 +1,71 @@
 package com.example.agent.provider.openai;
 
+import com.example.agent.core.message.ChatMessage;
+import java.util.List;
+
 import com.example.agent.core.model.ChatModel;
+import com.example.agent.core.request.ChatRequest;
+import com.example.agent.core.tool.ToolMetadata;
 
 public class OpenAiChatModel implements ChatModel {
+    private final String model;
+
+    public OpenAiChatModel(String model) {
+        this.model = model;
+    }
 
     @Override
-    public String chat(String message) {
+    public String chat(ChatRequest request) {
+        String requestModel = request.getModel();
+        String systemMessage = request.getSystemMessage();
+        List<ChatMessage> messages = request.getMessages();
+        List<ToolMetadata> tools = request.getTools();
+        Double temperature = request.getTemperature();
         System.out.println("目标即将接收的参数:");
-        System.out.println(message);
+        System.err.println("model = " + requestModel);
+        System.out.println("systemMessage = " + systemMessage);
+        System.out.println("temperature = " + temperature);
 
-        // 获取最后一条消息
-        String lastLine = getLastMeaningfulLine(message);
-
-        // 如果最后一条消息是工具开头的那么
-        if (lastLine.startsWith("tool:")) {
-            // 截取字符串从数组下标以字符 tool: 长度开始的剩余字符串
-            String toolResult = lastLine.substring("tool:".length());
-            return "根据工具查询结果：" + toolResult;
+        if (tools != null && !tools.isEmpty()) {
+            System.out.println("tools:");
+            tools.forEach(tool -> {
+                System.out.println("- name:" + tool.name() + ",description:" + tool.description());
+            });
         }
-        // 如果最后一条消息是用户那么
-        if (lastLine.startsWith("user:")) {
-            String userMessage = lastLine.substring("user:".length());
-            // 如果用户消息包含天气那么
+
+        messages.forEach(msg -> {
+            System.out.println(msg.role() + ":" + msg.content());
+        });
+
+        return doChat(request);
+    }
+
+    private String doChat(ChatRequest request) {
+        List<ChatMessage> messages = request.getMessages();
+
+        if (messages == null || messages.isEmpty()) {
+            return "没有消息";
+        }
+
+        ChatMessage lastMessage = messages.get(messages.size() - 1);
+
+        if ("tool".equals(lastMessage.role())) {
+            return "根据工具查询结果" + lastMessage.content();
+        }
+
+        if ("user".equals(lastMessage.role())) {
+            String userMessage = lastMessage.content();
             if (userMessage.contains("天气")) {
                 return "TOOL_CALL:weather:广州";
             }
         }
 
-        // 兜底返回
-        return "收到";
+        return "OpenAI response";
     }
 
-    public String getLastMeaningfulLine(String prompt) {
-        String[] lines = prompt.split("\n");
-        for (int i = lines.length - 1; i >= 0; i--) {
-            String line = lines[i];
-            if (!line.isEmpty()) {
-                return line;
-            }
-        }
-        return "";
+    @Override
+    public String modelName() {
+        return model;
     }
 
 }

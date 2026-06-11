@@ -1,4 +1,6 @@
-package com.example.agent.core.tool;
+package com.example.agent.demo;
+
+import com.example.agent.core.annotation.Tool;
 
 public class WeatherTool {
 

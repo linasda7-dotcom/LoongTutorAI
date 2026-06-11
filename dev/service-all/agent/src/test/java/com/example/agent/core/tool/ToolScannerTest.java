@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.example.agent.demo.WeatherTool;
+
 public class ToolScannerTest {
     @Test
     void testScan() {

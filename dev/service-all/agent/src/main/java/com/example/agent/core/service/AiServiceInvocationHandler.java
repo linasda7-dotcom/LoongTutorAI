@@ -6,10 +6,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.example.agent.core.memory.ChatMemory;
-import com.example.agent.core.message.AiMessage;
+import com.example.agent.core.message.AssistantMessage;
 import com.example.agent.core.message.ToolMessage;
 import com.example.agent.core.message.UserMessage;
 import com.example.agent.core.model.ChatModel;
+import com.example.agent.core.prompt.PromptBuilder;
+import com.example.agent.core.request.ChatRequest;
 import com.example.agent.core.tool.ToolCall;
 import com.example.agent.core.tool.ToolCallParser;
 import com.example.agent.core.tool.ToolExecutor;
@@ -21,6 +23,8 @@ public class AiServiceInvocationHandler implements InvocationHandler {
     private final ChatMemory chatMemory;
     private final String systemMessage;
     private final List<ToolMetadata> toolMetadataList = new ArrayList<>();
+    private final ToolExecutor toolExecutor;
+    private final PromptBuilder promptBuilder;
 
     public AiServiceInvocationHandler(ChatModel chatModel, ChatMemory chatMemory, String systemMessage,
             Object[] tools) {
@@ -28,129 +32,82 @@ public class AiServiceInvocationHandler implements InvocationHandler {
         this.chatModel = chatModel;
         this.chatMemory = chatMemory;
         this.systemMessage = systemMessage;
-
+        this.promptBuilder = new PromptBuilder();
         if (tools != null) {
             for (Object tool : tools) {
                 toolMetadataList.addAll(ToolScanner.scan(tool));
             }
         }
+        this.toolExecutor = new ToolExecutor(toolMetadataList);
     }
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        // 对象数组下标的第一条消息即用户输入的消息
-        String message = (String) args[0];
+        // 获取类声明
+        if (method.getDeclaringClass() == Object.class) {
+            return method.invoke(this, args);
+        }
+        String userMessage = buildUserMessage(args);
+        ChatRequest firstRequest = promptBuilder.buildFirstRequest(
+                chatModel.modelName(),
+                systemMessage,
+                chatMemory,
+                userMessage,
+                toolMetadataList,
+                null);
 
-        if (chatMemory != null) {
-            // 如果消息里不是空就添加
-            chatMemory.add(new UserMessage(message));
+        String firstResponse = chatModel.chat(firstRequest);
+        ToolCall toolCall = ToolCallParser.parse(firstResponse);
+        if (toolCall == null) {
+            saveConversation(userMessage, firstResponse);
+            return firstResponse;
         }
 
-        String prompt = chatMemory != null ? buildPrompt() : buildPromptWithoutMemory(message);
+        String toolResult = toolExecutor.execute(toolCall);
 
-        String chat = chatModel.chat(prompt);
+        ToolMessage toolMessage = new ToolMessage(
+                toolCall.name(), toolResult);
 
-        if (ToolCallParser.isToolCall(chat)) {
-            // 拿到工具名称和参数
-            ToolCall toolCall = ToolCallParser.parse(chat);
-            // 从列表找到工具
-            ToolMetadata tool = findTool(toolCall.name());
-            // 执行工具
-            Object toolResult = ToolExecutor.execute(
-                    tool,
-                    toolCall.argument());
+        ChatRequest secondRequest = promptBuilder.buildSecondRequest(chatModel.modelName(),
+                systemMessage,
+                chatMemory,
+                userMessage,
+                toolMessage,
+                toolMetadataList,
+                null);
 
-            if (chatMemory != null) {
-                chatMemory.add(new ToolMessage(String.valueOf(toolResult)));
-            }
+        String finalResponse = chatModel.chat(secondRequest);
 
-            String finalPrompt = chatMemory != null
-                    ? buildPrompt()
-                    : prompt + "tool:" + toolResult + "\n";
+        saveConversation(userMessage, finalResponse);
 
-            chat = chatModel.chat(finalPrompt);
+        return finalResponse;
+    }
+
+    private String buildUserMessage(Object[] args) {
+        // 如果用户输入为空
+        if (args == null || args.length == 0) {
+            // 返回空数据
+            return "";
         }
 
-        if (chatMemory != null) {
-            chatMemory.add(new AiMessage(chat));
+        if (args.length == 1) {
+            return String.valueOf(args[0]);
         }
 
-        return chat;
-    }
+        StringBuilder builder = new StringBuilder();
 
-    /**
-     * 构造提示词
-     * 
-     * @return
-     */
-    private String buildPrompt() {
-        StringBuilder promptBuilder = new StringBuilder();
-        appendSystemMessage(promptBuilder);
-        appendTools(promptBuilder);
-        chatMemory.messages().forEach(msg -> {
-            promptBuilder
-                    .append(msg.role())
-                    .append(":")
-                    .append(msg.content())
-                    .append("\n");
-        });
-        return promptBuilder.toString();
-    }
-
-    /**
-     * 构造提示词并输出历史消息
-     * 
-     * @param message
-     * @return
-     */
-    private String buildPromptWithoutMemory(String message) {
-        StringBuilder promptBuilder = new StringBuilder();
-        appendSystemMessage(promptBuilder);
-        appendTools(promptBuilder);
-        promptBuilder
-                .append("user:")
-                .append(message)
-                .append("\n");
-        return promptBuilder.toString();
-    }
-
-    /**
-     * 系统提示词构造
-     * 
-     * @param promptBuilder
-     */
-    private void appendSystemMessage(StringBuilder promptBuilder) {
-
-        if (systemMessage != null && !systemMessage.isBlank()) {
-            promptBuilder
-                    .append("system:")
-                    .append(systemMessage)
-                    .append("\n");
+        for (Object arg : args) {
+            builder.append(arg).append("\n");
         }
+        return builder.toString().trim();
     }
 
-    private void appendTools(StringBuilder promptBuilder) {
-        if (toolMetadataList.isEmpty()) {
+    public void saveConversation(String userMessage, String aiResponse) {
+        if (chatMemory == null) {
             return;
         }
-        promptBuilder.append("tools:\n");
-        for (ToolMetadata tool : toolMetadataList) {
-            promptBuilder
-                    .append("- name:")
-                    .append(tool.name())
-                    .append(",description:")
-                    .append(tool.description())
-                    .append("\n");
-        }
-    }
-
-    private ToolMetadata findTool(String name) {
-        for (ToolMetadata toll : toolMetadataList) {
-            if (toll.name().equals(name)) {
-                return toll;
-            }
-        }
-        throw new IllegalArgumentException("未找到工具：" + name);
+        chatMemory.add(new UserMessage(userMessage));
+        chatMemory.add(new AssistantMessage(aiResponse));
     }
 
 }
