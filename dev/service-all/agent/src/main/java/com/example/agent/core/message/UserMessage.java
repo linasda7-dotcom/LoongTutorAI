@@ -3,7 +3,7 @@ package com.example.agent.core.message;
 public class UserMessage extends ChatMessage {
 
     public UserMessage(String content) {
-        super(content);
+        super("user", content);
     }
 
     @Override

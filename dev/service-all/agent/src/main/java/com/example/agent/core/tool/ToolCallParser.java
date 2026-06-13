@@ -1,24 +1,37 @@
 package com.example.agent.core.tool;
 
 public class ToolCallParser {
-    private static final String PREFIX = "TOOL_CALL:";
+    private static final String TOOL_CALL_PREFIX = "TOOL_CALL:";
 
-    public static boolean isToolCall(String text) {
-        return text != null && text.startsWith(PREFIX);
-    }
+    public static ToolCall parse(String content) {
 
-    public static ToolCall pares(String text) {
-        if (!isToolCall(text)) {
-            throw new IllegalArgumentException("不是工具调用指令:" + text);
+        if (content == null || content.isBlank()) {
+            return null;
         }
-        String body = text.substring(PREFIX.length());
+
+        // AI返回的数据是否是TOOL_CALL开头
+        if (!content.startsWith(TOOL_CALL_PREFIX)) {
+            return null;
+        }
+
+        String body = content.substring(TOOL_CALL_PREFIX.length());
         String[] parts = body.split(":", 2);
 
-        if (parts.length != 2) {
-            throw new IllegalArgumentException("工具调用格式错误:" + text);
+        if (parts.length < 2) {
+            throw new RuntimeException("工具调用格式错误:" + content);
         }
-        String name = parts[0];
-        String argument = parts[1];
-        return new ToolCall(name, argument);
+
+        String name = parts[0].trim();
+        String arguments = parts[1].trim();
+
+        if (name == null || name.isBlank()) {
+            throw new RuntimeException("工具名称不能为空:" + content);
+        }
+
+        if (arguments.isBlank()) {
+            throw new RuntimeException("工具参数不能为空:" + content);
+        }
+
+        return new ToolCall("1", name, arguments);
     }
 }

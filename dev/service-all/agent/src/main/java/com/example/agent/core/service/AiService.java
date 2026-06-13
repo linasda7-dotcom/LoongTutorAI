@@ -51,8 +51,15 @@ public class AiService<T> {
         if (chatModel == null) {
             throw new IllegalArgumentException("chatModel不能为空");
         }
-        return (T) Proxy.newProxyInstance(serviceClass.getClassLoader(), new Class[] { serviceClass },
-                new AiServiceInvocationHandler(chatModel, chatMemory, systemMessage,tools));
+
+        return (T) Proxy.newProxyInstance(
+                serviceClass.getClassLoader(),
+                new Class[] { serviceClass },
+                new AiServiceInvocationHandler(
+                        chatModel,
+                        chatMemory,
+                        systemMessage,
+                        tools));
     }
 
 }
